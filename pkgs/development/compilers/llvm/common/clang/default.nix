@@ -31,7 +31,7 @@ stdenv.mkDerivation (
 
     src =
       if monorepoSrc != null then
-        runCommand "clang-src-${version}" { inherit (monorepoSrc) passthru; } ''
+        runCommand "clang-src-${version}" { } ''
           mkdir -p "$out"
           cp -r ${monorepoSrc}/cmake "$out"
           cp -r ${monorepoSrc}/clang "$out"
@@ -187,7 +187,6 @@ stdenv.mkDerivation (
       hardeningUnsupportedFlagsByTargetPlatform =
         targetPlatform:
         [ "fortify3" ]
-        ++ lib.optional (!targetPlatform.isLinux || !targetPlatform.isx86_64) "shadowstack"
         ++ lib.optional (!targetPlatform.isAarch64 || !targetPlatform.isLinux) "pacret"
         ++ lib.optional (
           !(targetPlatform.isLinux || targetPlatform.isFreeBSD)

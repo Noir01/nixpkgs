@@ -46,6 +46,8 @@ let
         cp -r ${monorepoSrc}/clang "$out"
         cp -r ${monorepoSrc}/clang-tools-extra "$out"
         cp -r ${monorepoSrc}/mlir "$out"
+        cp ${monorepoSrc}/MIT_LICENSE.TXT "$out"
+        cp ${monorepoSrc}/LICENSE.TXT "$out"
       ''
     else
       src;
@@ -103,7 +105,7 @@ let
     ]
     ++ devExtraCmakeFlags;
 
-    ninjaFlags = targets;
+    ninjaFlags = [ (lib.concatStringsSep " " targets) ];
 
     inherit targets;
 

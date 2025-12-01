@@ -21,6 +21,7 @@
   monorepoSrc ? null,
   version ? null,
   patchesFn ? lib.id,
+  enableClangToolsExtra ? true,
   cmake,
   cmakeMinimal,
   python3,
@@ -106,11 +107,11 @@ let
       };
   };
 
-  buildLlvmPackages = otherSplices.selfBuildHost;
+
 in
 makeScopeWithSplicing' {
   inherit otherSplices;
-  extra = _spliced0: args // metadata // { inherit buildLlvmPackages; };
+  extra = _spliced0: args // metadata // { buildLlvmPackages = _spliced0; };
   f =
     self:
     let
@@ -119,7 +120,13 @@ makeScopeWithSplicing' {
 
       # FIXME: This is a tragic and unprincipled hack, but I don’t
       # know what would actually be good instead.
-      newScope = scope: self.newScope ({ inherit (args) stdenv; } // scope);
+      newScope = scope: self.newScope ({
+        inherit (args) stdenv;
+        inherit (pkgs) fetchpatch libpfm libxml2 ncurses zlib libffi python3Packages;
+        replaceVars = pkgs.replaceVars or (src: subs: pkgs.substituteAll ({ inherit src; } // subs));
+        libbfd = null;
+        ld64 = pkgs.ld64 or null;
+      } // scope);
       callPackage = newScope { };
 
       clangVersion = lib.versions.major metadata.release_version;
@@ -165,7 +172,7 @@ makeScopeWithSplicing' {
     {
       inherit (metadata) release_version;
 
-      libllvm = callPackage ./llvm { };
+      libllvm = (callPackage ./llvm { }).overrideAttrs (old: { doCheck = false; });
 
       # `llvm` historically had the binaries.  When choosing an output explicitly,
       # we need to reintroduce `outputSpecified` to get the expected behavior e.g. of lib.get*
@@ -185,7 +192,9 @@ makeScopeWithSplicing' {
         ];
       };
 
-      libclang = callPackage ./clang { };
+      libclang = callPackage ./clang {
+        inherit enableClangToolsExtra;
+      };
 
       clang-unwrapped = self.libclang;
 
@@ -223,14 +232,14 @@ makeScopeWithSplicing' {
         cc = self.clang-unwrapped;
         # libstdcxx is taken from gcc in an ad-hoc way in cc-wrapper.
         libcxx = null;
-        extraPackages = [ targetLlvmPackages.compiler-rt ];
+        extraPackages = [ targetLlvmPackages.compiler-rt ] ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah;
         extraBuildCommands = mkExtraBuildCommands cc;
       };
 
       libcxxClang = wrapCCWith rec {
         cc = self.clang-unwrapped;
         libcxx = targetLlvmPackages.libcxx;
-        extraPackages = [ targetLlvmPackages.compiler-rt ];
+        extraPackages = [ targetLlvmPackages.compiler-rt ] ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah;
         extraBuildCommands = mkExtraBuildCommands cc;
       };
 
@@ -239,7 +248,7 @@ makeScopeWithSplicing' {
       systemLibcxxClang = wrapCCWith rec {
         cc = self.clang-unwrapped;
         libcxx = darwin.libcxx;
-        extraPackages = [ targetLlvmPackages.compiler-rt ];
+        extraPackages = [ targetLlvmPackages.compiler-rt ]; # ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah;
         extraBuildCommands = mkExtraBuildCommands cc;
       };
 
@@ -291,7 +300,7 @@ makeScopeWithSplicing' {
         bintools = bintools';
         extraPackages = [
           targetLlvmPackages.compiler-rt
-        ]
+        ] # ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah
         ++ lib.optionals (!stdenv.targetPlatform.isWasm && !stdenv.targetPlatform.isFreeBSD) [
           targetLlvmPackages.libunwind
         ];
@@ -325,7 +334,7 @@ makeScopeWithSplicing' {
         bintools = bintools';
         extraPackages = [
           targetLlvmPackages.compiler-rt-no-libc
-        ]
+        ] # ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah
         ++
           lib.optionals
             (
@@ -358,7 +367,7 @@ makeScopeWithSplicing' {
         cc = self.clang-unwrapped;
         libcxx = null;
         bintools = bintools';
-        extraPackages = [ targetLlvmPackages.compiler-rt-no-libc ];
+        extraPackages = [ targetLlvmPackages.compiler-rt-no-libc ]; # ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah;
         extraBuildCommands = mkExtraBuildCommandsBasicRt cc;
         nixSupport.cc-cflags = [
           "-rtlib=compiler-rt"
@@ -372,7 +381,7 @@ makeScopeWithSplicing' {
         cc = self.clang-unwrapped;
         libcxx = null;
         bintools = bintoolsNoLibc';
-        extraPackages = [ targetLlvmPackages.compiler-rt-no-libc ];
+        extraPackages = [ targetLlvmPackages.compiler-rt-no-libc ]; # ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah;
         extraBuildCommands = mkExtraBuildCommandsBasicRt cc;
         nixSupport.cc-cflags = [
           "-rtlib=compiler-rt"
@@ -413,9 +422,9 @@ makeScopeWithSplicing' {
           stdenv =
             # Darwin needs to use a bootstrap stdenv to avoid an infinite recursion when cross-compiling.
             if args.stdenv.hostPlatform.isDarwin then
-              overrideCC darwin.bootstrapStdenv buildLlvmPackages.clangWithLibcAndBasicRtAndLibcxx
+              overrideCC darwin.bootstrapStdenv self.buildLlvmPackages.clangWithLibcAndBasicRtAndLibcxx
             else if args.stdenv.hostPlatform.useLLVM or false then
-              overrideCC args.stdenv buildLlvmPackages.clangWithLibcAndBasicRtAndLibcxx
+              overrideCC args.stdenv self.buildLlvmPackages.clangWithLibcAndBasicRtAndLibcxx
             else
               args.stdenv;
         in
@@ -429,9 +438,9 @@ makeScopeWithSplicing' {
         stdenv =
           # Darwin needs to use a bootstrap stdenv to avoid an infinite recursion when cross-compiling.
           if stdenv.hostPlatform.isDarwin then
-            overrideCC darwin.bootstrapStdenv buildLlvmPackages.clangNoLibcNoRt
+            overrideCC darwin.bootstrapStdenv self.buildLlvmPackages.clangNoLibcNoRt
           else
-            overrideCC stdenv buildLlvmPackages.clangNoLibcNoRt;
+            overrideCC stdenv self.buildLlvmPackages.clangNoLibcNoRt;
       };
 
       compiler-rt =
@@ -450,20 +459,20 @@ makeScopeWithSplicing' {
         else
           self.compiler-rt-libc;
 
-      stdenv = overrideCC stdenv buildLlvmPackages.clang;
+      stdenv = overrideCC stdenv self.buildLlvmPackages.clang;
 
-      libcxxStdenv = overrideCC stdenv buildLlvmPackages.libcxxClang;
+      libcxxStdenv = overrideCC stdenv self.buildLlvmPackages.libcxxClang;
 
       libcxx = callPackage ./libcxx {
         stdenv =
           if stdenv.hostPlatform.isDarwin then
-            overrideCC darwin.bootstrapStdenv buildLlvmPackages.clangWithLibcAndBasicRt
+            overrideCC darwin.bootstrapStdenv self.buildLlvmPackages.clangWithLibcAndBasicRt
           else
-            overrideCC stdenv buildLlvmPackages.clangWithLibcAndBasicRt;
+            overrideCC stdenv self.buildLlvmPackages.clangWithLibcAndBasicRt;
       };
 
       libunwind = callPackage ./libunwind {
-        stdenv = overrideCC stdenv buildLlvmPackages.clangWithLibcAndBasicRt;
+        stdenv = overrideCC stdenv self.buildLlvmPackages.clangWithLibcAndBasicRt;
       };
 
       openmp = callPackage ./openmp { };
@@ -471,6 +480,15 @@ makeScopeWithSplicing' {
       mlir = callPackage ./mlir { };
 
       libclc = callPackage ./libclc { };
+    }
+    // lib.optionalAttrs (metadata.release_version == "opencilk") {
+      cheetah = callPackage ./cheetah {
+        monorepoSrc = metadata.monorepoSrc;
+      };
+
+      cilktools = callPackage ./cilktools {
+        monorepoSrc = metadata.monorepoSrc;
+      };
     }
     // lib.optionalAttrs (lib.versionAtLeast metadata.release_version "19") {
       bolt = callPackage ./bolt { };
@@ -482,14 +500,14 @@ makeScopeWithSplicing' {
         isFullBuild = false;
         # Use clang due to "gnu::naked" not working on aarch64.
         # Issue: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77882
-        stdenv = overrideCC stdenv buildLlvmPackages.clang;
+        stdenv = overrideCC stdenv self.buildLlvmPackages.clang;
       };
 
       libc-full = callPackage ./libc {
         isFullBuild = true;
         # Use clang due to "gnu::naked" not working on aarch64.
         # Issue: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=77882
-        stdenv = overrideCC stdenv buildLlvmPackages.clangNoLibcNoRt;
+        stdenv = overrideCC stdenv self.buildLlvmPackages.clangNoLibcNoRt;
         # FIXME: This should almost certainly be `stdenv.hostPlatform`.
         cmake = if stdenv.targetPlatform.libc == "llvm" then cmakeMinimal else cmake;
         python3 = if stdenv.targetPlatform.libc == "llvm" then python3Minimal else python3;

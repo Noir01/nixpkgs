@@ -31,6 +31,13 @@ let
       rev-version = "22.0.0-unstable-2025-11-23";
       sha256 = "sha256-9JbcykED9RyeXTjfuyHnLxexw98wO5huapt7veWa5A0=";
     };
+    "opencilk" = {
+      monorepoSrc = callPackage ./common/opencilk-source.nix { };
+      officialRelease.version = "19.1.7";
+      officialRelease.sha256 = null;
+      version = "19.1.7";
+      name = "opencilk";
+    };
   }
   // llvmVersions;
 
@@ -76,6 +83,6 @@ let
       )
     );
 
-  llvmPackages = lib.mapAttrs' (version: args: mkPackage (args // { inherit version; })) versions;
+  llvmPackages = lib.mapAttrs' (version: args: mkPackage ({ inherit version; } // args)) versions;
 in
 llvmPackages // { inherit mkPackage versions; }

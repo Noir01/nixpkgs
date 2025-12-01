@@ -18,7 +18,7 @@ rec {
         # llvm-exception: https://github.com/llvm/llvm-project/pull/92394
         lib.optionals (lib.versionAtLeast release_version "19") [
           asl20
-          llvm-exception
+          # llvm-exception
         ];
     teams = [ lib.teams.llvm ];
 

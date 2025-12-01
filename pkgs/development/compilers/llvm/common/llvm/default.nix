@@ -87,12 +87,14 @@ stdenv.mkDerivation (
 
     src =
       if monorepoSrc != null then
-        runCommand "llvm-src-${version}" { inherit (monorepoSrc) passthru; } (
+        runCommand "llvm-src-${version}" { } (
           ''
             mkdir -p "$out"
             cp -r ${monorepoSrc}/llvm "$out"
             cp -r ${monorepoSrc}/cmake "$out"
             cp -r ${monorepoSrc}/third-party "$out"
+            cp ${monorepoSrc}/MIT_LICENSE.TXT "$out"
+            cp ${monorepoSrc}/LICENSE.TXT "$out"
           ''
           + lib.optionalString enablePolly ''
             chmod u+w "$out/llvm/tools"
@@ -116,7 +118,6 @@ stdenv.mkDerivation (
 
     hardeningDisable = [
       "trivialautovarinit"
-      "shadowstack"
     ];
 
     patches =
