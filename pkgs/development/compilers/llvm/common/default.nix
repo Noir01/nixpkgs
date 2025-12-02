@@ -22,6 +22,7 @@
   version ? null,
   patchesFn ? lib.id,
   enableClangToolsExtra ? true,
+  isOpenCilk ? false,
   cmake,
   cmakeMinimal,
   python3,
@@ -232,14 +233,14 @@ makeScopeWithSplicing' {
         cc = self.clang-unwrapped;
         # libstdcxx is taken from gcc in an ad-hoc way in cc-wrapper.
         libcxx = null;
-        extraPackages = [ targetLlvmPackages.compiler-rt ] ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah;
+        extraPackages = [ targetLlvmPackages.compiler-rt ] ++ lib.optional isOpenCilk targetLlvmPackages.cheetah;
         extraBuildCommands = mkExtraBuildCommands cc;
       };
 
       libcxxClang = wrapCCWith rec {
         cc = self.clang-unwrapped;
         libcxx = targetLlvmPackages.libcxx;
-        extraPackages = [ targetLlvmPackages.compiler-rt ] ++ lib.optional (metadata.release_version == "opencilk") targetLlvmPackages.cheetah;
+        extraPackages = [ targetLlvmPackages.compiler-rt ] ++ lib.optional isOpenCilk targetLlvmPackages.cheetah;
         extraBuildCommands = mkExtraBuildCommands cc;
       };
 
@@ -481,7 +482,7 @@ makeScopeWithSplicing' {
 
       libclc = callPackage ./libclc { };
     }
-    // lib.optionalAttrs (metadata.release_version == "opencilk") {
+    // lib.optionalAttrs isOpenCilk {
       cheetah = callPackage ./cheetah {
         monorepoSrc = metadata.monorepoSrc;
       };

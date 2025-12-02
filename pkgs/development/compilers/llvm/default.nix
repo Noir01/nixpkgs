@@ -37,6 +37,7 @@ let
       officialRelease.sha256 = null;
       version = "19.1.7";
       name = "opencilk";
+      isOpenCilk = true;
     };
   }
   // llvmVersions;
@@ -48,6 +49,7 @@ let
       gitRelease ? null,
       monorepoSrc ? null,
       version ? null,
+      isOpenCilk ? false,
     }@args:
     let
       inherit
@@ -74,6 +76,7 @@ let
               patchesFn
               bootBintools
               bootBintoolsNoLibc
+              isOpenCilk
               ;
 
             otherSplices = generateSplicesForMkScope "llvmPackages_${attrName}";
