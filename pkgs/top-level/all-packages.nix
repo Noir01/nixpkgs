@@ -4535,6 +4535,8 @@ with pkgs;
       bolt_22 = llvmPackages_22.bolt;
       flang_22 = llvmPackages_22.flang;
 
+      llvmPackages_opencilk = llvmPackagesSet."opencilk";
+
       mkLLVMPackages = llvmPackagesSet.mkPackage;
     })
     llvmPackages_18
@@ -4569,6 +4571,7 @@ with pkgs;
     llvm_22
     bolt_22
     flang_22
+    llvmPackages_opencilk
     mkLLVMPackages
     ;
 
